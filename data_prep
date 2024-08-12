@@ -1,0 +1,84 @@
+-- Bring raw data into the schema
+CREATE OR REPLACE TABLE `exp_evaluation.raw_data` AS
+SELECT
+    *
+FROM
+    `api-project-939553954858.pa.pa_suggested_shops_sample_pub`;
+
+-- Create a staging table to store session dimensions 
+CREATE OR REPLACE TABLE `exp_evaluation.stg_session_dimensions` AS
+SELECT
+    session_id
+  , MAX(variation_name) AS variation_name
+  , MAX(visitType) AS visitType
+  , MAX(source) AS source
+  , MAX(medium) AS medium
+  , MAX(landingPage) AS landingPage
+  , MAX(appBrowser) AS appBrowser
+
+FROM
+    `exp_evaluation.raw_data`
+GROUP BY
+    session_id;
+
+
+-- Create a staging table to aggregate interaction data 
+CREATE OR REPLACE TABLE `exp_evaluation.stg_session_aggregations` AS
+SELECT
+    session_id
+  , variation_name
+  , COUNTIF(event_key = 'transaction') AS transactions
+  , COUNTIF(event_key = 'checkout.loaded') AS checkout_loaded
+  , COUNTIF(event_key = 'suggested_modal.shop_list.clicked') AS modal_clicks
+  , COUNTIF(event_key = 'suggested_shop.clicked') AS shop_clicks
+  , COUNTIF(event_key = 'suggested_popup.closed') AS popup_closures
+  , MIN(date) AS first_event_time
+  , MAX(date) AS last_event_time
+FROM
+    `exp_evaluation.raw_data`
+GROUP BY
+    session_id
+  , variation_name;
+
+-- Query to view the first 100 records from the staging aggregations table
+SELECT
+    *
+FROM
+    `exp_evaluation.stg_session_aggregations`
+LIMIT 100;
+
+-- Create a production table to summarize total sessions, conversions, and calculate conversion rates by variation
+CREATE OR REPLACE TABLE `exp_evaluation.prod_variation_summary` AS
+SELECT
+    variation_name
+  , COUNT(session_id) AS total_sessions
+  , SUM(transactions) AS total_conversions
+  , SAFE_DIVIDE(SUM(transactions), COUNT(session_id)) AS conversion_rate
+FROM
+    `exp_evaluation.stg_session_aggregations`
+GROUP BY
+    variation_name;
+
+-- Create a production table to store detailed interaction records for use in reporting tools like Tableau
+CREATE OR REPLACE TABLE `exp_evaluation.prod_interaction_details` AS
+SELECT
+    d.session_id
+  , d.variation_name
+  , d.visitType
+  , d.source
+  , d.medium
+  , d.landingPage
+  , d.appBrowser
+  , a.transactions
+  , a.checkout_loaded
+  , a.modal_clicks
+  , a.shop_clicks
+  , a.popup_closures
+  , a.first_event_time
+  , a.last_event_time
+FROM
+    `exp_evaluation.stg_session_aggregations` a
+JOIN
+    `exp_evaluation.stg_session_dimensions` d ON a.session_id = d.session_id;
+
+
