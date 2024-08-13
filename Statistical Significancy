@@ -1,0 +1,51 @@
+# Load necessary library
+if (!require("readr")) install.packages("readr")
+library(readr)
+
+# Load data from CSV / Replace with respective path
+data <- read_csv("C:/Users/User/Downloads/experiment_summary.csv")
+
+# Display the data to check its structure
+print(data)
+
+# Extract the numbers for each variation
+original <- data[data$variation_name == "Original",]
+variation1 <- data[data$variation_name == "Variation #1",]
+variation2 <- data[data$variation_name == "Variation #2",]
+
+# Construct matrices for pairwise comparison
+# Original vs Variation #1
+matrix_orig_v1 <- matrix(
+  c(original$total_conversions, original$total_sessions - original$total_conversions,
+    variation1$total_conversions, variation1$total_sessions - variation1$total_conversions),
+  ncol = 2, byrow = TRUE,
+  dimnames = list(c("Original", "Variation #1"), c("Converted", "Not_Converted"))
+)
+
+# Original vs Variation #2
+matrix_orig_v2 <- matrix(
+  c(original$total_conversions, original$total_sessions - original$total_conversions,
+    variation2$total_conversions, variation2$total_sessions - variation2$total_conversions),
+  ncol = 2, byrow = TRUE,
+  dimnames = list(c("Original", "Variation #2"), c("Converted", "Not_Converted"))
+)
+
+# Variation #1 vs Variation #2
+matrix_v1_v2 <- matrix(
+  c(variation1$total_conversions, variation1$total_sessions - variation1$total_conversions,
+    variation2$total_conversions, variation2$total_sessions - variation2$total_conversions),
+  ncol = 2, byrow = TRUE,
+  dimnames = list(c("Variation #1", "Variation #2"), c("Converted", "Not_Converted"))
+)
+
+# Perform Chi-squared tests
+test_orig_v1 <- chisq.test(matrix_orig_v1)
+test_orig_v2 <- chisq.test(matrix_orig_v2)
+test_v1_v2 <- chisq.test(matrix_v1_v2)
+
+# Print results
+print(test_orig_v1)
+print(test_orig_v2)
+print(test_v1_v2)
+
+
